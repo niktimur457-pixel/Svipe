@@ -398,19 +398,33 @@ app.post(
                 });
             }
 
-            const exists = db
-                .prepare(`
-                    SELECT id
-                    FROM users
-                    WHERE email = ?
-                `)
-                .get(email);
+            // Проверяем существующего пользователя
+            const exists = db.prepare(`
+                SELECT id, verified
+                FROM users
+                WHERE email = ?
+            `).get(email);
 
             if (exists) {
-                return res.status(400).json({
-                    error:
-                        "Пользователь с такой почтой уже существует"
-                });
+
+                // Аккаунт уже подтверждён
+                if (exists.verified) {
+                    return res.status(400).json({
+                        error:
+                            "Пользователь с такой почтой уже существует"
+                    });
+                }
+
+                // Старую незавершённую регистрацию удаляем
+                db.prepare(`
+                    DELETE FROM verification_codes
+                    WHERE email = ?
+                `).run(email);
+
+                db.prepare(`
+                    DELETE FROM users
+                    WHERE id = ?
+                `).run(exists.id);
             }
 
             const hash = await bcrypt.hash(
@@ -429,11 +443,25 @@ app.post(
             );
 
             const expiresAt =
-                Date.now() +
-                10 * 60 * 1000;
+                Date.now() + 10 * 60 * 1000;
 
-            // Создаём пользователя
-            const userResult = db.prepare(`
+            // Сначала отправляем письмо
+            await mailer.sendMail({
+                from: process.env.MAIL_USER,
+                to: email,
+                subject: "Код подтверждения Svipe",
+
+                text:
+                    `Ваш код подтверждения Svipe: ${code}\n\n` +
+                    `Код действует 10 минут.`
+            });
+
+            console.log(
+                `Verification code sent to ${email}`
+            );
+
+            // После успешной отправки создаём пользователя
+            db.prepare(`
                 INSERT INTO users
                 (
                     name,
@@ -452,75 +480,31 @@ app.post(
                 Date.now()
             );
 
-            try {
-                // Удаляем старые коды
-                db.prepare(`
-                    DELETE FROM verification_codes
-                    WHERE email = ?
-                `).run(email);
+            // Удаляем старый код
+            db.prepare(`
+                DELETE FROM verification_codes
+                WHERE email = ?
+            `).run(email);
 
-                // Сохраняем новый код
-                db.prepare(`
-                    INSERT INTO verification_codes
-                    (
-                        email,
-                        code,
-                        expires_at
-                    )
-                    VALUES (?, ?, ?)
-                `).run(
+            // Сохраняем новый код
+            db.prepare(`
+                INSERT INTO verification_codes
+                (
                     email,
                     code,
-                    expiresAt
-                );
-
-                // Отправляем письмо
-                await mailer.sendMail({
-                    from: process.env.MAIL_USER,
-                    to: email,
-                    subject:
-                        "Код подтверждения Svipe",
-
-                    text:
-                        `Ваш код подтверждения Svipe: ${code}\n\n` +
-                        `Код действует 10 минут.`
-                });
-
-                console.log(
-                    `Verification code sent to ${email}`
-                );
-
-            } catch (mailError) {
-
-                console.error(
-                    "MAIL ERROR:",
-                    mailError
-                );
-
-                // Если письмо не отправилось,
-                // удаляем созданного пользователя
-                db.prepare(`
-                    DELETE FROM verification_codes
-                    WHERE email = ?
-                `).run(email);
-
-                db.prepare(`
-                    DELETE FROM users
-                    WHERE id = ?
-                `).run(
-                    userResult.lastInsertRowid
-                );
-
-                return res.status(500).json({
-                    error:
-                        "Не удалось отправить код на почту. Проверь настройки почты."
-                });
-            }
+                    expires_at
+                )
+                VALUES (?, ?, ?)
+            `).run(
+                email,
+                code,
+                expiresAt
+            );
 
             return res.json({
                 success: true,
-                message:
-                    "Код отправлен на почту"
+                message: "Код отправлен на почту",
+                email
             });
 
         } catch (error) {
@@ -532,7 +516,7 @@ app.post(
 
             return res.status(500).json({
                 error:
-                    "Ошибка регистрации"
+                    "Не удалось отправить код на почту. Проверь настройки почты."
             });
         }
     }
