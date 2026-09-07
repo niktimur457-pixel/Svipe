@@ -9,7 +9,6 @@ const bcrypt = require("bcrypt");
 const jwt = require("jsonwebtoken");
 const Database = require("better-sqlite3");
 const WebSocket = require("ws");
-const nodemailer = require("nodemailer");
 const multer = require("multer");
 
 const app = express();
@@ -29,28 +28,40 @@ const JWT_SECRET =
 // MAIL
 // =========================
 
-const mailer = nodemailer.createTransport({
-    host: process.env.SMTP_HOST,
-    port: Number(process.env.SMTP_PORT) || 587,
-    secure: false,
-
-    auth: {
-        user: process.env.SMTP_USER,
-        pass: process.env.SMTP_PASSWORD
-    },
-
-    connectionTimeout: 15000,
-    greetingTimeout: 15000,
-    socketTimeout: 15000
-});
-
-mailer.verify()
-    .then(() => {
-        console.log("SMTP server: OK");
-    })
-    .catch((error) => {
-        console.error("SMTP server error:", error.message);
+async function sendVerificationEmail(email, code) {
+    const response = await fetch("https://api.brevo.com/v3/smtp/email", {
+        method: "POST",
+        headers: {
+            "accept": "application/json",
+            "api-key": process.env.BREVO_API_KEY,
+            "content-type": "application/json"
+        },
+        body: JSON.stringify({
+            sender: {
+                name: "Svipe",
+                email: process.env.MAIL_USER
+            },
+            to: [
+                {
+                    email: email
+                }
+            ],
+            subject: "Код подтверждения Svipe",
+            textContent:
+                `Ваш код подтверждения Svipe: ${code}\n\n` +
+                `Код действует 10 минут.`
+        })
     });
+
+    if (!response.ok) {
+        const errorText = await response.text();
+        throw new Error(
+            `Brevo API ${response.status}: ${errorText}`
+        );
+    }
+
+    console.log(`Verification email sent to ${email}`);
+}
 
 // =========================
 // EXPRESS
@@ -450,15 +461,7 @@ app.post(
                 Date.now() + 10 * 60 * 1000;
 
             // Сначала отправляем письмо
-            await mailer.sendMail({
-                from: process.env.MAIL_USER,
-                to: email,
-                subject: "Код подтверждения Svipe",
-
-                text:
-                    `Ваш код подтверждения Svipe: ${code}\n\n` +
-                    `Код действует 10 минут.`
-            });
+            await sendVerificationEmail(email, code);
 
             console.log(
                 `Verification code sent to ${email}`
