@@ -1,4 +1,4 @@
-server_code = r'''require("dotenv").config();
+require("dotenv").config();
 
 const express = require("express");
 const http = require("http");
