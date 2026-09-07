@@ -238,17 +238,17 @@ try {
 
 const mailer = nodemailer.createTransport({
     host: "smtp.mail.ru",
-    port: 465,
-    secure: true,
+    port: 587,
+    secure: false,
 
     auth: {
         user: process.env.MAIL_USER,
         pass: process.env.MAIL_PASSWORD
     },
 
-    connectionTimeout: 15000,
-    greetingTimeout: 15000,
-    socketTimeout: 15000
+    connectionTimeout: 30000,
+    greetingTimeout: 30000,
+    socketTimeout: 30000
 });
 
 async function sendVerificationEmail(email, code) {
