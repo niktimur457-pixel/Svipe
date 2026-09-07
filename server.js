@@ -924,7 +924,6 @@ server.listen(PORT, "0.0.0.0", async () => {
         console.error("SMTP ERROR:", error.message);
     }
 });
-'''
 path = "/mnt/data/server.js"
 with open(path, "w", encoding="utf-8") as f:
     f.write(server_code)
