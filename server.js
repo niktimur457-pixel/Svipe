@@ -31,12 +31,17 @@ const JWT_SECRET =
 
 const mailer = nodemailer.createTransport({
     host: "smtp.mail.ru",
-    port: 587,
-    secure: false,
+    port: 465,
+    secure: true,
+
     auth: {
         user: process.env.MAIL_USER,
         pass: process.env.MAIL_PASSWORD
-    }
+    },
+
+    connectionTimeout: 15000,
+    greetingTimeout: 15000,
+    socketTimeout: 15000
 });
 
 // Проверяем SMTP при запуске
