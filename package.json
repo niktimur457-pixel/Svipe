@@ -1,0 +1,21 @@
+{
+  "name": "svipe-messenger",
+  "version": "1.0.0",
+  "description": "Svipe Messenger",
+  "main": "server.js",
+  "scripts": {
+    "start": "node server.js",
+    "dev": "node --watch server.js"
+  },
+  "dependencies": {
+    "bcrypt": "^6.0.0",
+    "better-sqlite3": "^12.0.0",
+    "dotenv": "^17.0.0",
+    "express": "^5.1.0",
+    "jsonwebtoken": "^9.0.0",
+    "multer": "^2.3.0",
+    "nodemailer": "^7.0.13",
+    "resend": "^6.26.0",
+    "ws": "^8.18.0"
+  }
+}
